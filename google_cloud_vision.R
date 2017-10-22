@@ -1,33 +1,28 @@
 # devtools::install_github("cloudyr/RoogleVision")
-# source("http://bioconductor.org/biocLite.R")
-# biocLite("EBImage")
 
-
-# library(EBImage)
 library(tidyverse)
 library(RoogleVision)
 library(jsonlite)
-
 library(stringr)
 library(grid)
 library(jpeg)
 
 # Set google authentification
+# Have to register at google cloud first
 google_auth_cred <- fromJSON('google-credentials.json')
 options("googleAuthR.client_id" = google_auth_cred$installed$client_id)
 options("googleAuthR.client_secret" = google_auth_cred$installed$client_secret)
 options("googleAuthR.scopes.selected" = c("https://www.googleapis.com/auth/cloud-platform"))
 googleAuthR::gar_auth()
 
-# Load picture
+# Load pictures
 pic_pulpfiction <- "image/vincent_and_jules_car.jpg"
 pic_ekman <- "image/Ekman_faces.jpg"
 pic_faces <- "image/faces.jpg"
 
-
 gca_result <- getGoogleVisionResponse(pic_ekman, feature = 'FACE_DETECTION')
 
-# Create pretty functional programming solution
+# TODO: Create pretty functional programming solution. Now it is in two parts
 emotions <-
 gca_result %>% 
     select(joy = joyLikelihood, sadness = sorrowLikelihood, anger = angerLikelihood, surprise = surpriseLikelihood) %>% 
@@ -46,7 +41,7 @@ coords <-
             ymax = max(y)
     )
 
-
+# Putting together the emotions with the coordinates. Removing non-recognized emotions
 emotion_df <- 
     coords %>% 
     full_join(emotions, by = "id") %>% 
@@ -60,19 +55,16 @@ mgk_info <- tibble(height = dim(img)[1], width = dim(img)[2])
 g <- rasterGrob(img, interpolate = FALSE, width=unit(1,"npc"), height=unit(1,"npc"))
 
 ggplot(emotion_df) +
-    aes(xmin = xmin,
-        xmax = xmax,
-        ymin = ymin,
-        ymax = ymax,
+    aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax,
+        x = (xmin + xmax)/2, y = ymin, # x and y needed for the labels
         group = id,
         color = emotion,
         label = paste0(emotion %>% str_to_upper(), ": ", value %>% str_to_lower())) +
-    geom_blank() +
-    scale_x_continuous(limits=c(0,mgk_info$width)) +
-    scale_y_reverse(limits=c(mgk_info$height,0)) + # Y axis reversed in rastergrobs
+    scale_x_continuous(limits = c(0, mgk_info$width)) +
+    scale_y_reverse(limits = c(mgk_info$height, 0)) + # Y axis reversed in rastergrobs
     annotation_custom(g, xmin = 0, xmax = mgk_info$width, ymin = 0, ymax = -mgk_info$height) +
-    geom_rect(alpha = 0, size = 2) +
-    geom_label(aes(x = (xmin+xmax)/2, y = ymin, group = id)) +
+    geom_rect(alpha = 0.2, size = 2) +
+    geom_label() +
     theme_void() + 
     theme(legend.position = "none")
 
