@@ -1,14 +1,20 @@
+# This script uses the Google Cloud Vision API to recognize facial emotions
+# The API can recognize faces, and 4 distinct emotions (joy, anger, sadness, surprise)
+
 # devtools::install_github("cloudyr/RoogleVision")
 
 library(tidyverse)
 library(RoogleVision)
 library(jsonlite)
 library(stringr)
-library(grid)
+# library(grid)
 library(jpeg)
+
+source("plot_emotions_google.R")
 
 # Set google authentification
 # Have to register at google cloud first
+# Have to create credentials to use the API
 google_auth_cred <- fromJSON('google-credentials.json')
 options("googleAuthR.client_id" = google_auth_cred$installed$client_id)
 options("googleAuthR.client_secret" = google_auth_cred$installed$client_secret)
@@ -35,11 +41,41 @@ coords <-
     unnest(vertices) %>% 
     group_by(id) %>% 
     summarise(
-            xmin = min(x),
-            xmax = max(x),
-            ymin = min(y),
-            ymax = max(y)
+            xmin = nth(x,1),
+            xmax = nth(x,2),
+            ymin = nth(y,1),
+            ymax = nth(y,3)
+    ) %>% 
+    correct_coord()
+# Correct binding by calculating the average area (only applicable when faces are of the same size)data without missing 
+# The logic is this: calculate are for all 
+# Note that since we may have a max or min value missing, but hopefully not both, we have to 
+# caluculate max twice
+coords <-
+    coords %>% 
+    mutate(xlength = xmax - xmin,
+           ylength = ymax - ymin,
+           area = xlength * ylength,
+           area = ifelse(is.na(area), mean(area, na.rm = TRUE), area), # Imput area with average
+           xlength = ifelse(is.na(xlength), (area/ylength) %>% round(), xlength),
+           ylength = ifelse(is.na(ylength), (area/ylength) %>% round(), ylength)) %>% 
+    mutate(
+        xmax = ifelse(is.na(xmax), (xlength - xmin) %>% round(), xmax),
+        xmin = ifelse(is.na(xmin), (xlength - xmax) %>% round() %>% pmax(1), xmin),
+        xmax = ifelse(is.na(xmax), (xlength - xmin) %>% round(), xmax),
+        ymax = ifelse(is.na(ymax), (ylength - min) %>% round(), ymax),
+        ymin = ifelse(is.na(ymin), (ylength - ymax) %>% round() %>% pmax(1), ymin),
+        ymax = ifelse(is.na(ymax), (ylength - min) %>% round(), ymax)
     )
+          
+coords %>% 
+    summarise(mean_area = mean(area),
+              sd_area = sd(area))
+
+
+# Make lm predictions using the existing coordinate and the length, based on average area of rectangles
+# This is interesting, but not necessarily needed
+
 
 # Putting together the emotions with the coordinates. Removing non-recognized emotions
 emotion_df <- 
@@ -52,7 +88,7 @@ emotion_df <-
 # Plot the pic and the bounding recs with emotion prediction
 img <- readJPEG(pic_ekman)
 mgk_info <- tibble(height = dim(img)[1], width = dim(img)[2])
-g <- rasterGrob(img, interpolate = FALSE, width=unit(1,"npc"), height=unit(1,"npc"))
+g <- rasterGrob(img, interpolate = FALSE, width = unit(1, "npc"), height = unit(1, "npc"))
 
 ggplot(emotion_df) +
     aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax,
@@ -70,6 +106,6 @@ ggplot(emotion_df) +
 
 
 
-
-
+get_emotions_google("image/Ekman_faces.jpg")
+plot_emotions_google("image/Ekman_faces.jpg")
 
