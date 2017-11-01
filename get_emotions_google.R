@@ -4,6 +4,7 @@
 # EXAMPLE: get_emotions_google("image/Ekman_faces.jpg")
 library(tidyr)
 library(dplyr)
+library(stringr)
 library(RoogleVision)
 source("correct_coord.R")
 
@@ -40,6 +41,7 @@ get_emotions_google <- function(img_path){
     # Putting together the emotions with the coordinates. Making it tidy. Removing non-recognized emotions
         coords %>% 
             full_join(emotions, by = "id") %>% 
-            gather(emotion, value, joy:surprise) #%>% 
-            # filter(!str_detect(value, "UNLIKELY"))
+            gather(emotion, value, joy:surprise) %>% 
+            mutate(emotion = emotion %>% str_to_upper(),
+                   value = value %>% str_to_lower() %>% str_replace("_"," "))
 }
