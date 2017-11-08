@@ -4,3 +4,5 @@
 .Ruserdata
 google-credentials.json
 .httr-oauth
+results/*
+MSA_credentials.csv
