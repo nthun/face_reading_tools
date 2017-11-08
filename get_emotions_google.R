@@ -17,7 +17,7 @@ get_emotions_google <- function(img_path){
     # Extracting emotions for all recognized faces
     emotions <-
         gca_result %>% 
-        select(joy = joyLikelihood, 
+        select(happy = joyLikelihood, 
                sadness = sorrowLikelihood, 
                anger = angerLikelihood, 
                surprise = surpriseLikelihood) %>% 
@@ -41,7 +41,7 @@ get_emotions_google <- function(img_path){
     # Putting together the emotions with the coordinates. Making it tidy. Removing non-recognized emotions
         coords %>% 
             full_join(emotions, by = "id") %>% 
-            gather(emotion, value, joy:surprise) %>% 
+            gather(emotion, value, happy:surprise) %>% 
             mutate(emotion = emotion %>% str_to_upper(),
                    value = value %>% str_to_lower() %>% str_replace("_"," "))
 }
