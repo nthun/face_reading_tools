@@ -1,11 +1,12 @@
 # FUNCTION: Plots a google cloud face api result using ggplot
-# INPUT: emotion_df is a data frame that contains the transformed variables from get_emotions_google(), img_path is a path to the same jpeg file
+# INPUT: emotion_df is a data frame that contains the transformed variables from get_emotions_google() and labels are created using the create_plot_labels() function, img_path is a path to the same jpeg file
 # OUTPUT: A ggplot object
 # EXAMPLE: plot_emotions_google("image/Ekman_faces.jpg")
 library(tidyr)
 library(dplyr)
 library(ggplot2)
 library(jpeg)
+library(png)
 library(grid)
 library(ggrepel)
 
@@ -13,7 +14,8 @@ plot_emotions_google <- function(emotion_df, img_path){
     if (!file.exists(img_path)) return("No such file in the path")
 
     # Plot the pic and the bounding recs with emotion prediction
-    img <- readJPEG(img_path)
+    if (grepl(".jpg$|.jpeg$",img_path) == TRUE) {img <- readJPEG(img_path)}
+    if (grepl(".png$",img_path) == TRUE) {img <- readPNG(img_path)}
     mgk_info <- tibble(height = dim(img)[1], width = dim(img)[2])
     g <- rasterGrob(img, interpolate = FALSE, width = unit(1,"npc"), height = unit(1, "npc"))
     
