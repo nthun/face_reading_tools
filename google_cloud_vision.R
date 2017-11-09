@@ -9,8 +9,10 @@ library(jsonlite)
 library(stringr)
 # library(grid)
 library(jpeg)
-
-source("plot_emotions_google.R")
+library(glue)
+source("get_emotions_google.R")
+source("create_plot_labels.R")
+source("plot_emotions.R")
 
 # Set google authentification
 # Have to register at google cloud first
@@ -21,91 +23,89 @@ options("googleAuthR.client_secret" = google_auth_cred$installed$client_secret)
 options("googleAuthR.scopes.selected" = c("https://www.googleapis.com/auth/cloud-platform"))
 googleAuthR::gar_auth()
 
-# Load pictures
-pic_pulpfiction <- "image/vincent_and_jules_car.jpg"
-pic_ekman <- "image/Ekman_faces.jpg"
-pic_faces <- "image/faces.jpg"
-
 gca_result <- getGoogleVisionResponse(pic_ekman, feature = 'FACE_DETECTION')
 
-# TODO: Create pretty functional programming solution. Now it is in two parts
-emotions <-
-gca_result %>% 
-    select(joy = joyLikelihood, sadness = sorrowLikelihood, anger = angerLikelihood, surprise = surpriseLikelihood) %>% 
-        mutate(id = row_number())
+result %>% 
+    create_plot_labels() %>% 
+    plot_emotions("image/faces-of-american-power.jpg")
 
-coords <- 
-    gca_result %>% 
-    pull(fdBoundingPoly) %>%
-    mutate(id = row_number()) %>% 
-    unnest(vertices) %>% 
-    group_by(id) %>% 
-    summarise(
-            xmin = nth(x,1),
-            xmax = nth(x,2),
-            ymin = nth(y,1),
-            ymax = nth(y,3)
-    ) %>% 
-    correct_coord()
-# Correct binding by calculating the average area (only applicable when faces are of the same size)data without missing 
-# The logic is this: calculate are for all 
-# Note that since we may have a max or min value missing, but hopefully not both, we have to 
-# caluculate max twice
-coords <-
-    coords %>% 
-    mutate(xlength = xmax - xmin,
-           ylength = ymax - ymin,
-           area = xlength * ylength,
-           area = ifelse(is.na(area), mean(area, na.rm = TRUE), area), # Imput area with average
-           xlength = ifelse(is.na(xlength), (area/ylength) %>% round(), xlength),
-           ylength = ifelse(is.na(ylength), (area/ylength) %>% round(), ylength)) %>% 
-    mutate(
-        xmax = ifelse(is.na(xmax), (xlength - xmin) %>% round(), xmax),
-        xmin = ifelse(is.na(xmin), (xlength - xmax) %>% round() %>% pmax(1), xmin),
-        xmax = ifelse(is.na(xmax), (xlength - xmin) %>% round(), xmax),
-        ymax = ifelse(is.na(ymax), (ylength - min) %>% round(), ymax),
-        ymin = ifelse(is.na(ymin), (ylength - ymax) %>% round() %>% pmax(1), ymin),
-        ymax = ifelse(is.na(ymax), (ylength - min) %>% round(), ymax)
+# Get result with an ugly loop (can do progress bar in purrr:map)
+google_test_results <- data_frame()
+prog <- 0
+for (i in selected_pictures$image_file){
+    google_test_results <- bind_rows(google_test_results, 
+                                     get_emotions_google(i) %>% 
+                                         mutate(image_file = i)
     )
-          
-coords %>% 
-    summarise(mean_area = mean(area),
-              sd_area = sd(area))
+    prog <- prog + 1
+    print(glue::glue("Finished picture {prog} of {nrow(selected_pictures)}: {i}"))
+}
+
+## Evaluate google results compared to the labels
+# See whihch emotions are identified well
+google_test_results %>% 
+    mutate(emotion = if_else(emotion == "JOY", "happy", emotion %>% str_to_lower())) %>% 
+    left_join(selected_pictures, by = "image_file") %>% 
+    select(-image_file) %>% 
+    mutate(match = emotion.x %>% str_to_lower() == emotion.y) %>% 
+    filter(!str_detect(value, "unlikely") & match == TRUE) %>% # Exclude unlikely emotions
+    count(value, emotion.y)
+# Result:
+# happy: 10/10, surprise: 10/10, sadness: 7/10, anger: 0/10, disgust: NA, 
 
 
-# Make lm predictions using the existing coordinate and the length, based on average area of rectangles
-# This is interesting, but not necessarily needed
+google_test_results %>% 
+    filter(image_file == "./Emotion images/S082/005/S082_005_00000017.png") %>% 
+    create_plot_labels() %>%
+    plot_emotions("./Emotion images/S082/005/S082_005_00000017.png")
+
+# Plotting emotions
+temp <-
+    google_test_results %>% 
+    group_by(image_file) %>% 
+    nest(.key = "emotion_df") %>% 
+    mutate(pic_result = map2(emotion_df, image_file, ~plot_emotions(create_plot_labels(.x), .y))) %>% 
+    mutate(pic_id = str_match(image_file, ".*/(.*).png$")[,2]) %>% 
+    left_join(selected_pictures)
+
+# Create directory sructure for anotated pics
+walk(emotion_codes$emotion, ~dir.create(glue("./results/google_annotated_pictures/{.x}")))
+
+# Saving all plots to a specified folder structure
+pwalk(list(temp$pic_result, temp$emotion, temp$pic_id), ~ggsave(..1, filename = glue("./results/annotated_pictures/{..2}/{..3}.jpg")))
+
+temp %>% 
+    sample_n(1) %>% 
+    pull(pic_result)
+
+google_test_results %>% 
+    group_by(image_file) %>% 
+    nest() %>%
+    mutate(plot_label = map(data, ~create_plot_labels(.x)))
+
+# Save the test result lest we need to download them again
+load(file = "google_test_results.RData")
+# save(google_test_results, file = "google_test_results.RData")
 
 
-# Putting together the emotions with the coordinates. Removing non-recognized emotions
-emotion_df <- 
-    coords %>% 
-    full_join(emotions, by = "id") %>% 
-    gather(emotion, value, joy:surprise) %>% 
-    filter(!str_detect(value, "UNLIKELY"))
 
 
-# Plot the pic and the bounding recs with emotion prediction
-img <- readJPEG(pic_ekman)
-mgk_info <- tibble(height = dim(img)[1], width = dim(img)[2])
-g <- rasterGrob(img, interpolate = FALSE, width = unit(1, "npc"), height = unit(1, "npc"))
+df %>% 
+    filter(image_file == "./Emotion images/S082/005/S082_005_00000017.png") 
 
-ggplot(emotion_df) +
-    aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax,
-        x = (xmin + xmax)/2, y = ymin, # x and y needed for the labels
-        group = id,
-        color = emotion,
-        label = paste0(emotion %>% str_to_upper(), ": ", value %>% str_to_lower())) +
-    scale_x_continuous(limits = c(0, mgk_info$width)) +
-    scale_y_reverse(limits = c(mgk_info$height, 0)) + # Y axis reversed in rastergrobs
-    annotation_custom(g, xmin = 0, xmax = mgk_info$width, ymin = 0, ymax = -mgk_info$height) +
-    geom_rect(alpha = 0.2, size = 2) +
-    geom_label() +
-    theme_void() + 
-    theme(legend.position = "none")
 
+
+google_test_results %>% 
+    filter(image_file == "./Emotion images/S082/005/S082_005_00000017.png") %>% 
+    filter(!str_detect(value, "very unlikely")) %>% # Exclude very unlikely predictions
+    group_by(id, xmax, xmin, ymax, ymin) %>%
+    summarise(label = paste0(emotion, ": ", value) %>% paste(collapse = "\n")) %>%
+    full_join(df %>% select(-emotion, -value), by = c("id","xmax","xmin","ymax","ymin")) %>%
+    filter(!duplicated(id)) %>%
+    # mutate(label = if_else(is.na(label), "not recognized", label)) %>%
+    plot_emotions("./Emotion images/S082/005/S082_005_00000017.png")
 
 
 get_emotions_google("image/Ekman_faces.jpg")
-plot_emotions_google("image/Ekman_faces.jpg")
+
 
