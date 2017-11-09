@@ -22,7 +22,7 @@ plot_emotions_google <- function(emotion_df, img_path){
     ggplot(emotion_df) +
         aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax,
             x = (xmin + xmax)/2, y = ymin, # x and y needed for the labels
-            group = id,
+            group = face_id,
             label = label) +
         scale_x_continuous(limits = c(0, mgk_info$width)) +
         scale_y_reverse(limits = c(mgk_info$height, 0)) + # Y axis reversed in rastergrobs
