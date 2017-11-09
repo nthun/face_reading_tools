@@ -1,7 +1,7 @@
 # FUNCTION: Plots a google cloud face api result using ggplot
 # INPUT: emotion_df is a data frame that contains the transformed variables from get_emotions_google() and labels are created using the create_plot_labels() function, img_path is a path to the same jpeg file
 # OUTPUT: A ggplot object
-# EXAMPLE: plot_emotions_google("image/Ekman_faces.jpg")
+# EXAMPLE: plot_emotions(df, "image/Ekman_faces.jpg")
 library(tidyr)
 library(dplyr)
 library(ggplot2)
