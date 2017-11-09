@@ -21,8 +21,8 @@ selected_pictures <-
     group_by(emotion) %>% 
     sample_n(10) %>% 
     mutate(image_file = coding_file %>% str_replace("Emotion","Emotion images") %>% str_replace("_emotion.txt",".png"))  %>% 
-    mutate(id = str_match(image_file, ".*/(.*).png$")[,2]) %>%
-    select(id, emotion, everything())
+    mutate(pic_id = str_match(image_file, ".*/(.*).png$")[,2]) %>%
+    select(pic_id, emotion, everything())
 
 # This copies all selected images to one folder for easy handling (and minimalizing size requirements)
 walk(selected_pictures$image_file, ~file.copy(from = .x, to = "./ck_2_faces"))
