@@ -21,15 +21,15 @@ get_emotions_google <- function(img_path){
                sadness = sorrowLikelihood, 
                anger = angerLikelihood, 
                surprise = surpriseLikelihood) %>% 
-        mutate(id = row_number())
+        mutate(face_id = row_number())
     
     # Extact bounding rectangle coordinates
     coords <- 
         gca_result %>% 
         pull(fdBoundingPoly) %>%
-        mutate(id = row_number()) %>% 
+        mutate(face_id = row_number()) %>% 
         unnest(vertices) %>% 
-        group_by(id) %>% 
+        group_by(face_id) %>% 
         summarise(
             xmin = nth(x,1),
             xmax = nth(x,2),
@@ -40,7 +40,7 @@ get_emotions_google <- function(img_path){
 
     # Putting together the emotions with the coordinates. Making it tidy. Removing non-recognized emotions
         coords %>% 
-            full_join(emotions, by = "id") %>% 
+            full_join(emotions, by = "face_id") %>% 
             gather(emotion, value, happy:surprise) %>% 
             mutate(emotion = emotion %>% str_to_upper(),
                    value = value %>% str_to_lower() %>% str_replace("_"," "))

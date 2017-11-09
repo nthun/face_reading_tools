@@ -15,15 +15,15 @@ get_emotions_microsoft <- function(image_url, api_key){
     df <- content(API_response)
     
     map_dfr(df, "faceRectangle") %>% 
-        mutate(id = row_number()) %>% 
+        mutate(face_id = row_number()) %>% 
         full_join(map_dfr(df, "scores") %>% 
-                      mutate(id = row_number()),
-                  by = "id") %>% 
+                      mutate(face_id = row_number()),
+                  by = "face_id") %>% 
         mutate(xmin = left,
                xmax = left + width,
                ymin = top, # It is calculated from the top left
                ymax = top + height) %>% 
-        select(id, xmin:ymax, anger:surprise) %>% 
-        gather(emotion, value, -(id:ymax)) %>% 
+        select(face_id, xmin:ymax, anger:surprise) %>% 
+        gather(emotion, value, -(face_id:ymax)) %>% 
         mutate(value = value %>% round(2)) # Round values for 2 decimals
 }
