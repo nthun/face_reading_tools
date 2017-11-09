@@ -16,9 +16,3 @@ create_plot_labels <- function(df) {
         filter(!duplicated(id)) # %>% 
         # mutate(label = if_else(is.na(label), "not recognized", label))
 }
-
-# Get sample pictures for each emotion
-selected_pictures %>% 
-    group_by(emotion) %>% 
-    slice(1) %>% 
-    select(image_file)
