@@ -10,7 +10,7 @@ library(png)
 library(grid)
 library(ggrepel)
 
-plot_emotions_google <- function(emotion_df, img_path){
+plot_emotions <- function(emotion_df, img_path){
     if (!file.exists(img_path)) return("No such file in the path")
 
     # Plot the pic and the bounding recs with emotion prediction
