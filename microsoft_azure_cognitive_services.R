@@ -12,9 +12,6 @@ credentials <- read_csv("MSA_credentials.csv")
 api_key <- credentials$key1
 api_endpoint_url <- "https://westus.api.cognitive.microsoft.com/emotion/v1.0/recognize"
 
-face_jpg <- readJPEG("image/Ekman_faces.jpg")
-
-
 image_url <- "https://raw.githubusercontent.com/nthun/face_reading_tools/master/image/Ekman_faces.jpg"
 
 reqURL <- paste0(api_endpoint_url, "?visualFeatures=Faces")
@@ -53,11 +50,11 @@ for (i in urls){
     )
     prog <- prog + 1
     print(glue::glue("Finished picture {prog} of {length(urls)}: {i}"))
-    Sys.sleep(5)
+    Sys.sleep(3)
 }
 
 # save(microsoft_test_results, file = "microsoft_test_results.RData")
-# load("selected_pictures.RData")
+load("selected_pictures.RData")
 
 selected_pictures <- 
     selected_pictures %>% 
@@ -67,7 +64,7 @@ selected_pictures <-
 microsoft_plots <-
     microsoft_test_results %>% 
     mutate(image_file = str_match(image_file, ".*/(.*.png$)")[,2],
-           emotion = if_else(emotion == "happiness", "happy", emotion %>% str_to_lower())) %>% 
+           emotion = if_else(emotion == "happiness", "happy", emotion)) %>% 
     group_by(image_file) %>% 
     nest(.key = "emotion_df") %>% 
     mutate(pic_result = map2(emotion_df, image_file, ~plot_emotions(create_plot_labels(.x), paste0("ck_2_faces/", .y)))) %>% 
@@ -77,7 +74,7 @@ microsoft_plots <-
 walk(emotion_codes$emotion, ~dir.create(glue("./results/microsoft_annotated_pictures/{.x}")))
 
 # Save files
-pwalk(list(microsoft_plots$pic_result, microsoft_plots$emotion, microsoft_plots$pic_id), ~ggsave(..1, filename = glue("./results/microsoft_annotated_pictures/{..2}/{..3}.jpg"), width = 11, height = 6.4, units = "in"))
+pwalk(list(read_csv("emotions.csv")$emotion, microsoft_plots$emotion, microsoft_plots$pic_id), ~ggsave(..1, filename = glue("./results/microsoft_annotated_pictures/{..2}/{..3}.jpg"), width = 11, height = 6.4, units = "in"))
 
 ## Evaluate google results compared to the labels
 # See which emotions are identified well
@@ -105,3 +102,22 @@ microsoft_test_results %>%
     filter(emotion.x == emotion.y) %>% 
     group_by(emotion.x) %>% 
     summarise(mean = mean(value))
+
+
+# Create confusion matrix for results
+microsoft_test_results %>% 
+    mutate(image_file = str_match(image_file, ".*/(.*.png$)")[,2],
+           emotion = if_else(emotion == "happiness", "happy", emotion)) %>% 
+    left_join(selected_pictures, by = "image_file") %>% 
+    select(-image_file) %>% 
+    # mutate(match = emotion.x %>% str_to_lower() == emotion.y) %>% 
+    group_by(pic_id) %>% 
+    arrange(-value) %>% 
+    slice(1) %>% # Get only he value with the highest probability for each pic
+    ungroup() %>% 
+    select(prediction = emotion.x, reference = emotion.y) %>% 
+    table() %>% 
+    write.table("macs_ct.tsv")
+
+
+
