@@ -6,3 +6,5 @@ google-credentials.json
 .httr-oauth
 results/*
 MSA_credentials.csv
+AWS_credentials.csv
+kairos_credentials.csv
