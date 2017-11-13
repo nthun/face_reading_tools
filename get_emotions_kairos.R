@@ -6,18 +6,15 @@ api_endpoint_url <- "https://api.kairos.com/v2/media?source="
 uri_parameters <- "&timeout=15"
 
 get_emotions_kairos <- function(img_url, api_id, api_key){
-
     req_url <- paste0(api_endpoint_url, 
                       img_url %>% URLencode(reserved = TRUE), 
                       uri_parameters)
-    
     api_response <- POST(
         url = req_url,
         content_type('application/json'),
-        add_headers(.headers = c("app_id" = kairos_credentials$app_id,
-                                 "app_key" = kairos_credentials$key))
+        add_headers(.headers = c("app_id" = api_id,
+                                 "app_key" = api_key))
     )
-    
     response_list <- content(api_response)
     if (response_list$frames[[1]]$people %>% length > 0){
         df <- 
